@@ -14,10 +14,6 @@ type Client struct {
 	c  *rpc.Client
 }
 
-func NewClient(client *rpc.Client) {
-
-}
-
 func DialHTTP(network, address string) (*Client, error) {
 	client, err := rpc.DialHTTP(network, address)
 	if err != nil {
@@ -47,6 +43,10 @@ func DialHTTPPath(network, address, path string) (*Client, error) {
 }
 
 func (client *Client) Close() error {
+	if client == nil {
+		return nil
+	}
+
 	client.mu.Lock()
 	defer client.mu.Unlock()
 
@@ -54,6 +54,10 @@ func (client *Client) Close() error {
 }
 
 func (client *Client) Call(method string, args, reply interface{}) error {
+	if client == nil {
+		return nil
+	}
+
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 
@@ -83,6 +87,10 @@ func (client *Client) Reconnect() {
 }
 
 func (client *Client) Go(method string, args, reply interface{}, done chan *rpc.Call) *rpc.Call {
+	if client == nil {
+		return nil
+	}
+
 	client.mu.RLock()
 	defer client.mu.RUnlock()
 
