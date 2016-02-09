@@ -8,35 +8,40 @@ import (
 )
 
 type Client struct {
-	network, address string
+	network string
+	dialer  Address
 
 	mu *sync.RWMutex
 	c  *rpc.Client
 }
 
-func DialHTTP(network, address string) (*Client, error) {
-	client, err := rpc.DialHTTP(network, address)
+type Address interface {
+	String() string
+}
+
+func DialHTTP(network string, dialer Address) (*Client, error) {
+	client, err := rpc.DialHTTP(network, dialer.String())
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
 		network: network,
-		address: address,
+		dialer:  dialer,
 		mu:      new(sync.RWMutex),
 		c:       client,
 	}, nil
 }
 
-func DialHTTPPath(network, address, path string) (*Client, error) {
-	client, err := rpc.DialHTTPPath(network, address, path)
+func DialHTTPPath(network string, dialer Address, path string) (*Client, error) {
+	client, err := rpc.DialHTTPPath(network, dialer.String(), path)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
 		network: network,
-		address: address,
+		dialer:  dialer,
 		mu:      new(sync.RWMutex),
 		c:       client,
 	}, nil
@@ -59,14 +64,16 @@ func (client *Client) Call(method string, args, reply interface{}) error {
 	}
 
 	client.mu.RLock()
-	defer client.mu.RUnlock()
 
 	err := client.c.Call(method, args, reply)
 	if err != nil && IsNetworkError(err) {
+		client.mu.RUnlock()
 		client.Reconnect()
 		//retry call
 		return client.Call(method, args, reply)
 	}
+
+	client.mu.RUnlock()
 
 	return err
 }
@@ -77,7 +84,7 @@ func (client *Client) Reconnect() {
 
 	client.mu.Lock()
 	for {
-		rpcClient, err = rpc.DialHTTP(client.network, client.address)
+		rpcClient, err = rpc.DialHTTP(client.network, client.dialer.String())
 		if err == nil {
 			break
 		}
